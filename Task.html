@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đề thi trắc nghiệm FreeRTOS – Task</title>
+
+<!-- ===== CẤU HÌNH MATHJAX ===== -->
+<script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      displayMath: [['$$', '$$'], ['\\[', '\\]']]
+    },
+    svg: { fontCache: 'global' },
+    options: {
+      skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+    }
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 26px 14px 70px;
+    font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: radial-gradient(circle at 20% 0%, #0f2a3f 0%, #0a1a26 45%, #05101a 100%);
+    background-attachment: fixed;
+    color: #e2e8f0;
+    line-height: 1.65;
+  }
+
+  .wrap { max-width: 920px; margin: 0 auto; }
+
+  /* ===== HEADER ===== */
+  header {
+    background: linear-gradient(145deg, #102a3d, #0b1f2e);
+    border: 1px solid #1f4a63;
+    border-radius: 18px;
+    padding: 24px 26px;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(120, 220, 255, 0.08);
+    margin-bottom: 22px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  header::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.12), transparent);
+    animation: sweep 5s linear infinite;
+  }
+
+  @keyframes sweep {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  header h1 {
+    position: relative;
+    margin: 0 0 6px;
+    font-size: 1.45rem;
+    letter-spacing: 1px;
+    color: #7dd3fc;
+    text-transform: uppercase;
+    text-shadow: 0 0 18px rgba(56, 189, 248, 0.45);
+  }
+
+  header .sub {
+    position: relative;
+    margin: 0 0 16px;
+    font-size: 0.98rem;
+    color: #94a3b8;
+    font-style: italic;
+  }
+
+  .score-bar {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(56, 189, 248, 0.09);
+    border: 2px solid #0ea5e9;
+    color: #7dd3fc;
+    font-weight: 700;
+    padding: 8px 22px;
+    border-radius: 999px;
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+  }
+
+  /* ===== CARD CÂU HỎI ===== */
+  .card {
+    background: linear-gradient(160deg, #10222f, #0b1a24);
+    border: 1px solid #1d3d52;
+    border-radius: 16px;
+    padding: 20px 22px 22px;
+    margin-bottom: 18px;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+    animation: fadeUp 0.4s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-head { margin-bottom: 10px; }
+
+  .badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #0ea5e9, #2563eb);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    padding: 4px 14px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    box-shadow: 0 0 14px rgba(14, 165, 233, 0.5);
+  }
+
+  .question-text {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #e8f4ff;
+    margin-bottom: 16px;
+  }
+
+  /* ===== ĐÁP ÁN ===== */
+  .options { display: grid; gap: 10px; }
+
+  .option {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    width: 100%;
+    text-align: left;
+    padding: 12px 16px;
+    font-family: inherit;
+    font-size: 1rem;
+    color: #cbd5e1;
+    background: #0e1e29;
+    border: 2px solid #1e3a4d;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+
+  .option:not(.disabled):hover {
+    background: #13303f;
+    border-color: #0ea5e9;
+    transform: translateX(5px);
+    box-shadow: 0 0 16px rgba(14, 165, 233, 0.28);
+  }
+
+  .option .letter {
+    flex: 0 0 30px;
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #1e3a4d;
+    color: #7dd3fc;
+    font-weight: 700;
+    font-size: 0.92rem;
+    transition: all 0.18s ease;
+  }
+
+  .option .opt-text { flex: 1; }
+
+  .option.disabled { cursor: default; }
+
+  /* Đáp án đúng -> XANH */
+  .option.correct {
+    background: #052e1c;
+    border-color: #22c55e;
+    color: #86efac;
+    font-weight: 600;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18), 0 0 20px rgba(34, 197, 94, 0.3);
+  }
+  .option.correct .letter { background: #22c55e; color: #04231a; }
+
+  /* Đáp án sai -> ĐỎ */
+  .option.wrong {
+    background: #3b0d0d;
+    border-color: #ef4444;
+    color: #fca5a5;
+    font-weight: 600;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18), 0 0 20px rgba(239, 68, 68, 0.3);
+  }
+  .option.wrong .letter { background: #ef4444; color: #2b0505; }
+
+  /* ===== LỜI GIẢI ===== */
+  .explanation {
+    display: none;
+    margin-top: 15px;
+    padding: 15px 18px;
+    border-radius: 12px;
+    background: #0c1a24;
+    border-left: 6px solid #334155;
+    font-size: 0.97rem;
+    color: #cbd5e1;
+    animation: fadeUp 0.35s ease both;
+  }
+
+  .explanation.show { display: block; }
+  .explanation.ok  { border-left-color: #22c55e; background: #061f14; }
+  .explanation.no  { border-left-color: #ef4444; background: #240a0a; }
+
+  .verdict {
+    font-size: 1.05rem;
+    font-weight: 800;
+    margin-bottom: 10px;
+    letter-spacing: 0.3px;
+  }
+  .verdict.ok { color: #4ade80; }
+  .verdict.no { color: #f87171; }
+
+  .explanation p { margin: 8px 0; }
+  .explanation b { color: #7dd3fc; }
+
+  /* ===== NÚT LÀM LẠI ===== */
+  .reset-wrap { text-align: center; margin-top: 26px; }
+
+  .reset-btn {
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #04231a;
+    background: linear-gradient(135deg, #4ade80, #0ea5e9);
+    border: none;
+    padding: 13px 36px;
+    border-radius: 999px;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    box-shadow: 0 8px 22px rgba(14, 165, 233, 0.45);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .reset-btn:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(74, 222, 128, 0.5); }
+  .reset-btn:active { transform: translateY(0); }
+
+  @media (max-width: 560px) {
+    header h1 { font-size: 1.1rem; }
+    .card { padding: 16px 15px 18px; }
+    .question-text { font-size: 0.98rem; }
+    .option { font-size: 0.93rem; padding: 11px 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Đề thi trắc nghiệm FreeRTOS</h1>
+    <p class="sub">Chủ đề: Tác vụ (Task) — 10 câu hỏi, mỗi câu chỉ có 1 đáp án đúng</p>
+    <div class="score-bar">
+      <span>🎯 Số câu đúng:</span>
+      <span id="score">0 / 10</span>
+    </div>
+  </header>
+
+  <div id="quiz"></div>
+
+  <div class="reset-wrap">
+    <button class="reset-btn" id="resetBtn">🔄 Làm lại từ đầu</button>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   DỮ LIỆU 10 CÂU HỎI TRẮC NGHIỆM – TASK TRONG FREERTOS
+   ========================================================= */
+const quizData = [
+
+  /* -------- Câu 1 -------- */
+  {
+    question: "Trong FreeRTOS, một task có thể tồn tại ở những trạng thái nào sau đây?",
+    options: [
+      "Running, Ready, Blocked, Suspended",
+      "Running, Sleeping, Waiting, Dead",
+      "Init, Run, Stop, Delete",
+      "Active, Passive, Idle, Busy"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. Đây là 4 trạng thái chuẩn của một task trong FreeRTOS: đang chạy, sẵn sàng, bị chặn và bị treo.",
+      "Sai. FreeRTOS không dùng các tên trạng thái này. \"Sleeping\" và \"Waiting\" được gộp chung vào trạng thái Blocked.",
+      "Sai. Đây là các trạng thái của một máy trạng thái chung, không phải mô hình trạng thái task của FreeRTOS.",
+      "Sai. Đây không phải là tên trạng thái task trong FreeRTOS."
+    ],
+    explain: "FreeRTOS định nghĩa 4 trạng thái task: <b>Running</b> (đang chiếm CPU), <b>Ready</b> (sẵn sàng chạy nhưng chưa được cấp CPU), <b>Blocked</b> (đang chờ sự kiện hoặc chờ hết thời gian delay) và <b>Suspended</b> (bị treo, không tham gia lập lịch cho tới khi được đánh thức)."
+  },
+
+  /* -------- Câu 2 -------- */
+  {
+    question: "Trong hàm tạo task của FreeRTOS, tham số <i>usStackDepth</i> quy định điều gì?",
+    options: [
+      "Số byte của vùng nhớ stack dành cho task",
+      "Số word (đơn vị <i>StackType_t</i>) của vùng nhớ stack dành cho task",
+      "Số lượng task con mà task này có thể tạo",
+      "Độ ưu tiên của task"
+    ],
+    correct: 1,
+    notes: [
+      "Sai. Đây là lỗi rất phổ biến — nếu hiểu là byte thì stack thực tế sẽ bị cấp phát gấp nhiều lần so với dự kiến.",
+      "Đúng. Đơn vị là word, kích thước thực của stack tính bằng byte phải nhân thêm với kích thước của <i>StackType_t</i>.",
+      "Sai. Số task con không liên quan tới tham số này; mỗi task được tạo độc lập.",
+      "Sai. Độ ưu tiên là một tham số riêng (thường là tham số thứ tư)."
+    ],
+    explain: "Kích thước stack thực tế tính bằng byte theo công thức: $Stack_{byte} = usStackDepth \\times \\text{sizeof}(StackType\\_t)$. Trên hầu hết vi điều khiển 32-bit, $\\text{sizeof}(StackType\\_t) = 4$ byte, nên $usStackDepth = 128$ tương ứng $128 \\times 4 = 512$ byte stack."
+  },
+
+  /* -------- Câu 3 -------- */
+  {
+    question: "So sánh độ ưu tiên của task trong FreeRTOS: một task có giá trị ưu tiên <b>số lớn hơn</b> thì:",
+    options: [
+      "Có mức ưu tiên cao hơn, được lập lịch trước",
+      "Có mức ưu tiên thấp hơn, chạy sau",
+      "Có mức ưu tiên ngang bằng với các task khác",
+      "Là giá trị không hợp lệ và bị FreeRTOS từ chối"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. FreeRTOS quy ước số ưu tiên càng lớn thì mức ưu tiên càng cao.",
+      "Sai. Đây là quy ước ngược lại, giống với một số hệ điều hành khác nhưng không đúng với FreeRTOS.",
+      "Sai. Các task chỉ ngang bằng ưu tiên khi có cùng giá trị số ưu tiên.",
+      "Sai. Miễn là giá trị nằm trong khoảng từ 0 đến $\\text{configMAX\\_PRIORITIES} - 1$ thì hợp lệ."
+    ],
+    explain: "Trong FreeRTOS, mức ưu tiên được biểu diễn bằng số nguyên, giá trị càng lớn thì mức ưu tiên càng cao. Task có ưu tiên cao nhất trong số các task ở trạng thái Ready sẽ được cấp CPU. Giá trị ưu tiên hợp lệ nằm trong khoảng từ $0$ đến $\\text{configMAX\\_PRIORITIES} - 1$."
+  },
+
+  /* -------- Câu 4 -------- */
+  {
+    question: "Trên một vi điều khiển <b>một nhân</b> (single-core), tại một thời điểm có tối đa bao nhiêu task ở trạng thái Running?",
+    options: [
+      "1 task",
+      "2 task",
+      "Bằng số task đã được tạo",
+      "Bằng giá trị $\\text{configMAX\\_PRIORITIES}$"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. Một nhân CPU chỉ có thể thực thi một luồng lệnh tại một thời điểm, nên chỉ có đúng 1 task ở trạng thái Running.",
+      "Sai. Điều này chỉ đúng trên hệ thống đa nhân (multi-core), nơi mỗi nhân có thể chạy một task riêng.",
+      "Sai. Số task đã tạo có thể rất lớn, nhưng phần lớn chúng đang ở trạng thái Ready hoặc Blocked.",
+      "Sai. $\\text{configMAX\\_PRIORITIES}$ là số mức ưu tiên tối đa, không phải số task chạy đồng thời."
+    ],
+    explain: "Vì CPU chỉ có một nhân và tại mỗi thời điểm chỉ thực thi được một dòng lệnh, nên chỉ có duy nhất 1 task ở trạng thái Running. Các task còn lại nằm ở Ready, Blocked hoặc Suspended. Việc chuyển đổi giữa các task diễn ra rất nhanh tạo cảm giác chúng chạy song song."
+  },
+
+  /* -------- Câu 5 -------- */
+  {
+    question: "Điểm khác biệt chính giữa <i>vTaskDelay()</i> và <i>vTaskDelayUntil()</i> là gì?",
+    options: [
+      "<i>vTaskDelay()</i> hoãn tương đối so với lúc gọi, còn <i>vTaskDelayUntil()</i> hoãn theo mốc thời gian tuyệt đối (chu kỳ cố định)",
+      "<i>vTaskDelay()</i> hoãn theo chu kỳ cố định, còn <i>vTaskDelayUntil()</i> hoãn tương đối",
+      "Hai hàm hoàn toàn giống nhau, chỉ khác tên gọi",
+      "<i>vTaskDelay()</i> chỉ dùng được cho task có ưu tiên cao nhất"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. <i>vTaskDelay()</i> đợi một khoảng thời gian kể từ thời điểm gọi, còn <i>vTaskDelayUntil()</i> đợi đến một mốc thời gian xác định, nhờ đó chu kỳ task không bị trôi.",
+      "Sai. Đã đảo ngược vai trò của hai hàm.",
+      "Sai. Hai hàm có bản chất hoàn toàn khác nhau, ảnh hưởng trực tiếp tới tính chính xác của chu kỳ.",
+      "Sai. Cả hai hàm đều dùng được cho task ở bất kỳ mức ưu tiên nào."
+    ],
+    explain: "<i>vTaskDelay(n)</i> đặt task vào Blocked đúng $n$ tick kể từ lúc gọi, nên nếu thân task tốn thời gian xử lý thì chu kỳ sẽ bị trôi dần. <i>vTaskDelayUntil()</i> nhận vào mốc thời gian thức dậy trước đó và cộng thêm chu kỳ mong muốn, nhờ đó giữ chu kỳ ổn định — rất phù hợp cho các task định kỳ như đọc cảm biến, điều khiển PID."
+  },
+
+  /* -------- Câu 6 -------- */
+  {
+    question: "Một hệ FreeRTOS có $\\text{configTICK\\_RATE\\_HZ} = 1000$. Một task gọi <i>vTaskDelay(250)</i>. Thời gian task bị hoãn là bao nhiêu?",
+    options: [
+      "$250$ ms",
+      "$25$ ms",
+      "$1000$ ms",
+      "$2{,}5$ s"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. Mỗi tick tương ứng $1$ ms, nên $250$ tick $= 250$ ms.",
+      "Sai. Kết quả này ứng với việc chia sai cho $10^4$.",
+      "Sai. $1000$ ms là chu kỳ của 1000 tick, không phải 250 tick.",
+      "Sai. $2{,}5$ s là kết quả khi tính nhầm $250 \\times 10$ ms."
+    ],
+    explain: "Chu kỳ một tick: $T_{tick} = \\dfrac{1}{\\text{configTICK\\_RATE\\_HZ}} = \\dfrac{1}{1000}\\ \\text{s} = 1\\ \\text{ms}$. Vậy thời gian hoãn: $\\Delta t = 250 \\times T_{tick} = 250\\ \\text{ms} = 0{,}25\\ \\text{s}$."
+  },
+
+  /* -------- Câu 7 -------- */
+  {
+    question: "Khi một task gọi hàm chờ semaphore (với timeout khác 0) nhưng semaphore chưa sẵn sàng, task sẽ chuyển sang trạng thái nào?",
+    options: [
+      "Blocked",
+      "Suspended",
+      "Ready",
+      "Deleted"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. Task tự nguyện nhường CPU và nằm trong danh sách chờ sự kiện — đây chính là trạng thái Blocked.",
+      "Sai. Suspended là trạng thái bị treo do task khác can thiệp, không phải do tự chờ tài nguyên.",
+      "Sai. Ready nghĩa là task sẵn sàng chạy, trong khi ở đây nó đang phải đợi sự kiện.",
+      "Sai. Task chỉ bị xóa khi gọi hàm xóa task, không phải khi chờ semaphore."
+    ],
+    explain: "Khi chờ một sự kiện (semaphore, queue, thông báo task…) với thời gian timeout khác $0$, task sẽ vào trạng thái <b>Blocked</b> và tự động được đưa trở lại Ready khi sự kiện xảy ra <i>hoặc</i> khi hết thời gian timeout. Nếu timeout bằng $0$ thì hàm trả về ngay lập tức mà không chặn task."
+  },
+
+  /* -------- Câu 8 -------- */
+  {
+    question: "Hàm task trong FreeRTOS phải có dạng nào sau đây?",
+    options: [
+      "Trả về kiểu <i>void</i>, nhận một tham số con trỏ <i>void*</i>, và tuyệt đối không được <i>return</i>",
+      "Trả về kiểu <i>int</i> để báo mã lỗi cho hệ điều hành",
+      "Trả về kiểu <i>void</i>, không nhận tham số nào",
+      "Là hàm không có kiểu trả về và có thể <i>return</i> tùy ý"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. Đây là nguyên mẫu chuẩn: <i>void TenTask(void *pvParameters)</i>, và hàm phải kết thúc bằng việc xóa chính nó hoặc một vòng lặp vô hạn.",
+      "Sai. Nếu hàm task <i>return</i>, hành vi không được định nghĩa và thường gây lỗi nghiêm trọng.",
+      "Sai. Hàm task luôn nhận một tham số con trỏ <i>void*</i>, dù có thể truyền giá trị <i>NULL</i>.",
+      "Sai. Hàm task bắt buộc phải khai báo kiểu trả về <i>void</i> và không được phép thoát ra bằng <i>return</i>."
+    ],
+    explain: "Nguyên mẫu chuẩn của hàm task là: $\\texttt{void TenTask(void *pvParameters)}$. Tham số $pvParameters$ cho phép truyền dữ liệu vào task khi tạo. Hàm task <b>không bao giờ được return</b> — nếu muốn kết thúc, phải gọi hàm xóa chính task đó; nếu là task chạy mãi thì dùng vòng lặp vô hạn bên trong."
+  },
+
+  /* -------- Câu 9 -------- */
+  {
+    question: "Gọi <i>vTaskDelete(NULL)</i> bên trong một task có tác dụng gì?",
+    options: [
+      "Xóa chính task đang gọi hàm đó",
+      "Xóa task có mức ưu tiên thấp nhất trong hệ thống",
+      "Xóa tất cả các task đang tồn tại",
+      "Không làm gì cả, đây là lệnh không hợp lệ"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. Truyền <i>NULL</i> có nghĩa là \"xóa task hiện tại\" — task gọi hàm sẽ bị giải phóng khỏi hệ thống.",
+      "Sai. Không có cơ chế xóa task theo mức ưu tiên.",
+      "Sai. Muốn xóa nhiều task phải gọi hàm xóa cho từng task với handle tương ứng.",
+      "Sai. Đây là cách dùng hợp lệ và rất phổ biến để kết thúc một task một lần."
+    ],
+    explain: "Hàm xóa task nhận tham số là handle của task cần xóa. Khi truyền <i>NULL</i>, FreeRTOS hiểu là xóa chính task đang gọi. Lưu ý quan trọng: bộ nhớ stack và TCB của task bị xóa <b>không được thu hồi tự động</b> nếu task đó không phải do Idle task dọn — do đó nên cấu hình <i>INCLUDE_vTaskDelete</i> và để Idle task giải phóng tài nguyên."
+  },
+
+  /* -------- Câu 10 -------- */
+  {
+    question: "Task Idle (task rảnh) trong FreeRTOS có mức ưu tiên là bao nhiêu?",
+    options: [
+      "$0$ — thấp nhất, tương ứng với hằng số <i>tskIDLE_PRIORITY</i>",
+      "$1$ — mức ưu tiên trung bình",
+      "$\\text{configMAX\\_PRIORITIES} - 1$ — cao nhất",
+      "Bằng mức ưu tiên của task được tạo đầu tiên"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. Idle task luôn có mức ưu tiên $0$ — thấp nhất trong hệ thống, và được tạo tự động khi scheduler khởi động.",
+      "Sai. Mức ưu tiên $1$ vẫn cao hơn Idle task, nên task này sẽ chạy trước Idle.",
+      "Sai. Đây là mức ưu tiên cao nhất, hoàn toàn trái ngược với vai trò của Idle task.",
+      "Sai. Idle task có mức ưu tiên cố định là $0$, không phụ thuộc vào thứ tự tạo task."
+    ],
+    explain: "Idle task được FreeRTOS tạo tự động khi scheduler bắt đầu chạy, với mức ưu tiên $\\text{tskIDLE\\_PRIORITY} = 0$ (thấp nhất). Nó chỉ chạy khi không còn task nào khác ở trạng thái Ready. Ngoài ra, Idle task còn đảm nhiệm việc giải phóng bộ nhớ cho các task đã bị xóa, vì vậy tuyệt đối không nên để nó bị đói CPU quá lâu (ví dụ bằng cách dùng task có ưu tiên cao chạy vòng lặp vô hạn không nhường CPU)."
+  }
+];
+
+/* =========================================================
+   HIỂN THỊ ĐỀ THI
+   ========================================================= */
+const quizEl  = document.getElementById('quiz');
+const scoreEl = document.getElementById('score');
+const LETTERS = ['A', 'B', 'C', 'D'];
+
+let correctCount = 0;
+
+/* --- Render công thức MathJax (chờ thư viện sẵn sàng) --- */
+let mathJaxTries = 0;
+function typesetMath(el) {
+  if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
+    window.MathJax.typesetPromise([el]).catch(err => console.warn('MathJax:', err));
+  } else if (mathJaxTries++ < 150) {
+    setTimeout(() => typesetMath(el), 100);
+  }
+}
+
+/* --- Cập nhật điểm --- */
+function updateScore() {
+  scoreEl.textContent = correctCount + ' / ' + quizData.length;
+}
+
+/* --- Xây dựng toàn bộ đề --- */
+function buildQuiz() {
+  quizEl.innerHTML = '';
+  correctCount = 0;
+  updateScore();
+
+  quizData.forEach((item, qi) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const head = document.createElement('div');
+    head.className = 'card-head';
+    head.innerHTML = '<span class="badge">Câu ' + (qi + 1) + '</span>';
+
+    const qText = document.createElement('div');
+    qText.className = 'question-text';
+    qText.innerHTML = item.question;
+
+    const opts = document.createElement('div');
+    opts.className = 'options';
+
+    item.options.forEach((opt, oi) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'option';
+      btn.innerHTML =
+        '<span class="letter">' + LETTERS[oi] + '</span>' +
+        '<span class="opt-text">' + opt + '</span>';
+      btn.addEventListener('click', () => handleSelect(qi, oi, card, opts));
+      opts.appendChild(btn);
+    });
+
+    const exp = document.createElement('div');
+    exp.className = 'explanation';
+
+    card.appendChild(head);
+    card.appendChild(qText);
+    card.appendChild(opts);
+    card.appendChild(exp);
+    quizEl.appendChild(card);
+  });
+
+  typesetMath(quizEl);
+}
+
+/* =========================================================
+   XỬ LÝ KHI CHỌN ĐÁP ÁN
+   ========================================================= */
+function handleSelect(qi, oi, card, opts) {
+  if (card.dataset.done === '1') return;   // đã trả lời -> không cho chọn lại
+  card.dataset.done = '1';
+
+  const item    = quizData[qi];
+  const isRight = (oi === item.correct);
+
+  // Tô màu các lựa chọn
+  const buttons = opts.querySelectorAll('.option');
+  buttons.forEach((btn, i) => {
+    btn.classList.add('disabled');
+    if (i === item.correct) btn.classList.add('correct');   // đáp án đúng: XANH
+    if (i === oi && !isRight) btn.classList.add('wrong');   // chọn sai: ĐỎ
+  });
+
+  if (isRight) correctCount++;
+  updateScore();
+
+  // Tạo nội dung lời giải
+  const exp = card.querySelector('.explanation');
+  let html = '';
+
+  if (isRight) {
+    html += '<div class="verdict ok">✅ Chính xác! Đáp án ' + LETTERS[item.correct] + ' là đúng.</div>';
+    html += '<p><b>Vì sao đúng:</b> ' + item.notes[oi] + '</p>';
+  } else {
+    html += '<div class="verdict no">❌ Chưa đúng! Bạn chọn ' + LETTERS[oi] +
+            ' — đáp án đúng là <b>' + LETTERS[item.correct] + '</b>.</div>';
+    html += '<p><b>Vì sao lựa chọn ' + LETTERS[oi] + ' sai:</b> ' + item.notes[oi] + '</p>';
+    html += '<p><b>Vì sao ' + LETTERS[item.correct] + ' đúng:</b> ' + item.notes[item.correct] + '</p>';
+  }
+
+  html += '<p><b>📘 Lời giải chi tiết:</b> ' + item.explain + '</p>';
+
+  exp.innerHTML = html;
+  exp.classList.add('show', isRight ? 'ok' : 'no');
+
+  typesetMath(exp);
+}
+
+/* =========================================================
+   KHỞI ĐỘNG
+   ========================================================= */
+document.addEventListener('DOMContentLoaded', () => {
+  buildQuiz();
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    buildQuiz();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+});
+</script>
+
+</body>
+</html>
