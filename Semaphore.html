@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đề thi trắc nghiệm FreeRTOS – Semaphore</title>
+
+<!-- ===== CẤU HÌNH MATHJAX ===== -->
+<script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      displayMath: [['$$', '$$'], ['\\[', '\\]']]
+    },
+    svg: { fontCache: 'global' },
+    options: {
+      skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+    }
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 26px 14px 70px;
+    font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: radial-gradient(circle at 15% 0%, #2a0f3f 0%, #150a26 45%, #0a0518 100%);
+    background-attachment: fixed;
+    color: #e9e2f5;
+    line-height: 1.65;
+  }
+
+  .wrap { max-width: 920px; margin: 0 auto; }
+
+  /* ===== HEADER ===== */
+  header {
+    background: linear-gradient(145deg, #241039, #1a0b2a);
+    border: 1px solid #4c2a70;
+    border-radius: 18px;
+    padding: 24px 26px;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(200, 150, 255, 0.1);
+    margin-bottom: 22px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  header::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(192, 132, 252, 0.15), transparent);
+    animation: sweep 5s linear infinite;
+  }
+
+  @keyframes sweep {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  header h1 {
+    position: relative;
+    margin: 0 0 6px;
+    font-size: 1.45rem;
+    letter-spacing: 1px;
+    color: #d8b4fe;
+    text-transform: uppercase;
+    text-shadow: 0 0 18px rgba(192, 132, 252, 0.55);
+  }
+
+  header .sub {
+    position: relative;
+    margin: 0 0 16px;
+    font-size: 0.98rem;
+    color: #a89bc4;
+    font-style: italic;
+  }
+
+  .score-bar {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(192, 132, 252, 0.1);
+    border: 2px solid #a855f7;
+    color: #d8b4fe;
+    font-weight: 700;
+    padding: 8px 22px;
+    border-radius: 999px;
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+  }
+
+  /* ===== CARD CÂU HỎI ===== */
+  .card {
+    background: linear-gradient(160deg, #1e1030, #150a24);
+    border: 1px solid #3d2159;
+    border-radius: 16px;
+    padding: 20px 22px 22px;
+    margin-bottom: 18px;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+    animation: fadeUp 0.4s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-head { margin-bottom: 10px; }
+
+  .badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #a855f7, #7c3aed);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    padding: 4px 14px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    box-shadow: 0 0 14px rgba(168, 85, 247, 0.55);
+  }
+
+  .question-text {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #f0e9ff;
+    margin-bottom: 16px;
+  }
+
+  /* ===== ĐÁP ÁN ===== */
+  .options { display: grid; gap: 10px; }
+
+  .option {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    width: 100%;
+    text-align: left;
+    padding: 12px 16px;
+    font-family: inherit;
+    font-size: 1rem;
+    color: #d5c9e8;
+    background: #1a0f2a;
+    border: 2px solid #3a2456;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+
+  .option:not(.disabled):hover {
+    background: #26153d;
+    border-color: #a855f7;
+    transform: translateX(5px);
+    box-shadow: 0 0 16px rgba(168, 85, 247, 0.3);
+  }
+
+  .option .letter {
+    flex: 0 0 30px;
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #3a2456;
+    color: #d8b4fe;
+    font-weight: 700;
+    font-size: 0.92rem;
+    transition: all 0.18s ease;
+  }
+
+  .option .opt-text { flex: 1; }
+
+  .option.disabled { cursor: default; }
+
+  /* Đáp án đúng -> XANH */
+  .option.correct {
+    background: #052e1c;
+    border-color: #22c55e;
+    color: #86efac;
+    font-weight: 600;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18), 0 0 20px rgba(34, 197, 94, 0.3);
+  }
+  .option.correct .letter { background: #22c55e; color: #04231a; }
+
+  /* Đáp án sai -> ĐỎ */
+  .option.wrong {
+    background: #3b0d0d;
+    border-color: #ef4444;
+    color: #fca5a5;
+    font-weight: 600;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18), 0 0 20px rgba(239, 68, 68, 0.3);
+  }
+  .option.wrong .letter { background: #ef4444; color: #2b0505; }
+
+  /* ===== LỜI GIẢI ===== */
+  .explanation {
+    display: none;
+    margin-top: 15px;
+    padding: 15px 18px;
+    border-radius: 12px;
+    background: #170c26;
+    border-left: 6px solid #4c2a70;
+    font-size: 0.97rem;
+    color: #d5c9e8;
+    animation: fadeUp 0.35s ease both;
+  }
+
+  .explanation.show { display: block; }
+  .explanation.ok  { border-left-color: #22c55e; background: #061f14; }
+  .explanation.no  { border-left-color: #ef4444; background: #240a0a; }
+
+  .verdict {
+    font-size: 1.05rem;
+    font-weight: 800;
+    margin-bottom: 10px;
+    letter-spacing: 0.3px;
+  }
+  .verdict.ok { color: #4ade80; }
+  .verdict.no { color: #f87171; }
+
+  .explanation p { margin: 8px 0; }
+  .explanation b { color: #d8b4fe; }
+
+  /* ===== NÚT LÀM LẠI ===== */
+  .reset-wrap { text-align: center; margin-top: 26px; }
+
+  .reset-btn {
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a0b2a;
+    background: linear-gradient(135deg, #d8b4fe, #a855f7);
+    border: none;
+    padding: 13px 36px;
+    border-radius: 999px;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    box-shadow: 0 8px 22px rgba(168, 85, 247, 0.5);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .reset-btn:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(216, 180, 254, 0.55); }
+  .reset-btn:active { transform: translateY(0); }
+
+  @media (max-width: 560px) {
+    header h1 { font-size: 1.1rem; }
+    .card { padding: 16px 15px 18px; }
+    .question-text { font-size: 0.98rem; }
+    .option { font-size: 0.93rem; padding: 11px 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Đề thi trắc nghiệm FreeRTOS</h1>
+    <p class="sub">Chủ đề: Semaphore — 10 câu hỏi, mỗi câu chỉ có 1 đáp án đúng</p>
+    <div class="score-bar">
+      <span>🎯 Số câu đúng:</span>
+      <span id="score">0 / 10</span>
+    </div>
+  </header>
+
+  <div id="quiz"></div>
+
+  <div class="reset-wrap">
+    <button class="reset-btn" id="resetBtn">🔄 Làm lại từ đầu</button>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   DỮ LIỆU 10 CÂU HỎI TRẮC NGHIỆM – SEMAPHORE TRONG FREERTOS
+   ========================================================= */
+const quizData = [
+
+  /* -------- Câu 1 -------- */
+  {
+    question: "Trong FreeRTOS, semaphore nhị phân (binary semaphore) có giá trị đếm nằm trong khoảng nào?",
+    options: [
+      "Chỉ nhận giá trị $0$ hoặc $1$",
+      "Nhận mọi giá trị nguyên dương",
+      "Nhận giá trị từ $0$ đến $\\text{configMAX\\_SEMAPHORES} - 1$",
+      "Nhận giá trị âm hoặc dương tùy ý"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. Binary semaphore chỉ có hai trạng thái: có sẵn (đếm bằng $1$) hoặc không có sẵn (đếm bằng $0$).",
+      "Sai. Đó là đặc điểm của counting semaphore, không phải binary semaphore.",
+      "Sai. Không có macro cấu hình nào giới hạn giá trị của semaphore như vậy.",
+      "Sai. Bộ đếm semaphore không bao giờ nhận giá trị âm trong FreeRTOS."
+    ],
+    explain: "Semaphore nhị phân được dùng như một cờ báo hiệu: giá trị $0$ nghĩa là không có tín hiệu, giá trị $1$ nghĩa là có tín hiệu. Khi một task gọi hàm \"take\" thành công, bộ đếm chuyển từ $1$ về $0$; khi một task gọi \"give\", bộ đếm chuyển từ $0$ lên $1$. Do đó giá trị luôn thuộc tập $\\{0, 1\\}$."
+  },
+
+  /* -------- Câu 2 -------- */
+  {
+    question: "Điểm khác biệt cốt lõi giữa semaphore nhị phân và mutex trong FreeRTOS là gì?",
+    options: [
+      "Mutex có cơ chế kế thừa ưu tiên (priority inheritance), còn semaphore nhị phân thì không",
+      "Mutex có thể đếm nhiều hơn $1$, còn semaphore nhị phân chỉ có $1$",
+      "Semaphore nhị phân chỉ dùng được trong ngắt, còn mutex chỉ dùng trong task",
+      "Hai loại hoàn toàn giống nhau về mọi mặt"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. Mutex được thiết kế cho việc bảo vệ tài nguyên dùng chung và có cơ chế kế thừa ưu tiên để tránh đảo ngược ưu tiên.",
+      "Sai. Cả hai đều có giá trị tối đa là $1$; đặc điểm \"đếm nhiều\" thuộc về counting semaphore.",
+      "Sai. Cả hai đều có thể dùng trong task; trong ngắt chỉ được dùng các hàm có hậu tố <i>FromISR</i>.",
+      "Sai. Chúng khác nhau về mục đích sử dụng và cơ chế xử lý ưu tiên."
+    ],
+    explain: "Về bản chất triển khai, mutex và binary semaphore khá giống nhau, nhưng mutex có thêm cơ chế <b>kế thừa ưu tiên</b> (priority inheritance). Khi một task có ưu tiên thấp đang giữ mutex mà bị task ưu tiên trung bình chen ngang, FreeRTOS sẽ tạm nâng ưu tiên của task đang giữ mutex lên bằng task đang chờ, nhờ đó giảm hiện tượng đảo ngược ưu tiên. Binary semaphore không có cơ chế này."
+  },
+
+  /* -------- Câu 3 -------- */
+  {
+    question: "Counting semaphore trong FreeRTOS thường được dùng cho mục đích nào sau đây?",
+    options: [
+      "Đếm số sự kiện đã xảy ra hoặc quản lý một lượng tài nguyên có số lượng hữu hạn",
+      "Bảo vệ vùng găng (critical section) thay cho mutex",
+      "Thay thế hoàn toàn cho ngắt phần cứng",
+      "Lưu trữ dữ liệu tạm thời giữa các task"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. Counting semaphore lý tưởng cho việc đếm sự kiện (mỗi lần ngắt give một lần) hoặc quản lý một pool tài nguyên có $N$ phần tử.",
+      "Sai. Việc bảo vệ vùng găng nên dùng mutex để tránh đảo ngược ưu tiên.",
+      "Sai. Semaphore không thể thay thế ngắt — nó chỉ là cơ chế đồng bộ giữa các task hoặc giữa ngắt và task.",
+      "Sai. Để truyền dữ liệu giữa các task, người ta dùng queue hoặc stream buffer, không dùng semaphore."
+    ],
+    explain: "Counting semaphore có bộ đếm nhận giá trị từ $0$ đến $N$. Mỗi lần \"give\" tăng bộ đếm, mỗi lần \"take\" giảm bộ đếm. Ứng dụng điển hình: đếm số lần một ngắt đã xảy ra (bộ đếm có thể vượt quá $1$ nếu task xử lý chậm hơn tốc độ ngắt), hoặc quản lý một bể gồm $N$ tài nguyên giống nhau (ví dụ $N$ buffer trong pool)."
+  },
+
+  /* -------- Câu 4 -------- */
+  {
+    question: "Khi một task gọi hàm chờ semaphore với thời gian timeout bằng $0$, điều gì sẽ xảy ra nếu semaphore hiện không sẵn sàng?",
+    options: [
+      "Hàm trả về ngay lập tức với mã lỗi, task không bị chặn",
+      "Task bị chặn vô thời hạn cho đến khi có semaphore",
+      "Task bị chặn đúng $1$ tick rồi tự động thoát",
+      "Hệ thống tự động khởi động lại"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. Timeout bằng $0$ nghĩa là \"kiểm tra rồi trả về ngay\", đây là cách thăm dò không chặn (non-blocking poll).",
+      "Sai. Chặn vô thời hạn tương ứng với timeout bằng giá trị đặc biệt (thường là $\\text{portMAX\\_DELAY}$).",
+      "Sai. Không có cơ chế tự động chặn $1$ tick khi timeout bằng $0$.",
+      "Sai. FreeRTOS không có hành vi tự khởi động lại trong tình huống này."
+    ],
+    explain: "Tham số timeout trong các hàm chờ semaphore quy định số tick tối đa mà task sẵn sàng bị chặn. Khi timeout bằng $0$, nếu semaphore không sẵn sàng thì hàm trả về ngay với giá trị báo thất bại (thường là $\\text{pdFALSE}$), task tiếp tục thực thi mà không chuyển sang trạng thái Blocked. Điều này rất hữu ích khi cần kiểm tra nhanh trong vòng lặp."
+  },
+
+  /* -------- Câu 5 -------- */
+  {
+    question: "Giả sử $\\text{configTICK\\_RATE\\_HZ} = 100$ và một task gọi hàm chờ semaphore với timeout $= 50$ tick. Thời gian chờ tối đa tính bằng mili-giây là:",
+    options: [
+      "$500$ ms",
+      "$50$ ms",
+      "$5$ ms",
+      "$5000$ ms"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. Mỗi tick dài $10$ ms, nên $50$ tick tương ứng $50 \\times 10 = 500$ ms.",
+      "Sai. Kết quả này ứng với việc nhầm $\\text{configTICK\\_RATE\\_HZ} = 1000$.",
+      "Sai. Kết quả này chỉ đúng khi $\\text{configTICK\\_RATE\\_HZ} = 10000$.",
+      "Sai. Đây là kết quả khi tính nhầm số tick gấp $10$ lần."
+    ],
+    explain: "Chu kỳ một tick: $T_{tick} = \\dfrac{1}{\\text{configTICK\\_RATE\\_HZ}} = \\dfrac{1}{100}\\ \\text{s} = 10\\ \\text{ms}$. Vậy thời gian chờ tối đa: $t = 50 \\times 10\\ \\text{ms} = 500\\ \\text{ms} = 0{,}5\\ \\text{s}$."
+  },
+
+  /* -------- Câu 6 -------- */
+  {
+    question: "Khi một ngắt (ISR) muốn \"give\" một semaphore để đánh thức một task, hàm nào phải được sử dụng?",
+    options: [
+      "Phiên bản hàm có hậu tố <i>FromISR</i>",
+      "Phiên bản hàm thông thường dùng trong task",
+      "Bất kỳ hàm nào cũng được, không có sự khác biệt",
+      "Chỉ có thể dùng mutex trong ngắt"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. Trong ISR bắt buộc dùng các hàm có hậu tố <i>FromISR</i> vì chúng an toàn với ngữ cảnh ngắt và trả về thông tin về việc có cần chuyển ngữ cảnh hay không.",
+      "Sai. Hàm thông thường có thể gọi các API không an toàn trong ngắt, gây treo hoặc hỏng hệ thống.",
+      "Sai. FreeRTOS phân biệt rõ ràng giữa ngữ cảnh task và ngữ cảnh ngắt.",
+      "Sai. Mutex không được phép dùng trong ngắt; chỉ binary semaphore mới phù hợp để báo hiệu từ ngắt."
+    ],
+    explain: "Các API FreeRTOS có hai phiên bản: một dùng trong task và một dùng trong ISR (có hậu tố <i>FromISR</i>). Trong ngắt phải dùng phiên bản <i>FromISR</i>, và thường phải truyền thêm tham số <i>pxHigherPriorityTaskWoken</i> để báo cho kernel biết có cần chuyển ngữ cảnh ngay khi thoát ngắt hay không. Mutex tuyệt đối không được dùng trong ISR vì cơ chế kế thừa ưu tiên không hoạt động trong ngữ cảnh ngắt."
+  },
+
+  /* -------- Câu 7 -------- */
+  {
+    question: "Hiện tượng \"đảo ngược ưu tiên\" (priority inversion) xảy ra khi nào?",
+    options: [
+      "Task ưu tiên cao phải chờ một task ưu tiên thấp đang giữ tài nguyên, trong khi task ưu tiên trung bình chen vào chạy",
+      "Hai task cùng ưu tiên chạy song song trên hai nhân CPU",
+      "Task ưu tiên cao luôn được cấp CPU trước task ưu tiên thấp",
+      "Hệ thống tự động tăng ưu tiên cho mọi task"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. Đây là mô tả chính xác của hiện tượng đảo ngược ưu tiên — task ưu tiên cao bị \"chôn\" sau task ưu tiên trung bình vì phải chờ task ưu tiên thấp nhả tài nguyên.",
+      "Sai. Đây là hoạt động bình thường trên hệ đa nhân, không phải đảo ngược ưu tiên.",
+      "Sai. Đây là hành vi đúng của bộ lập lịch, không phải hiện tượng bất thường.",
+      "Sai. FreeRTOS không tự động tăng ưu tiên cho mọi task; chỉ mutex mới kích hoạt kế thừa ưu tiên có chọn lọc."
+    ],
+    explain: "Đảo ngược ưu tiên xảy ra theo kịch bản: task $H$ (ưu tiên cao) chờ mutex đang bị task $L$ (ưu tiên thấp) giữ; trong lúc đó task $M$ (ưu tiên trung bình) sẵn sàng và chiếm CPU, khiến $L$ không được chạy để nhả mutex, và $H$ bị chặn gián tiếp bởi $M$. Giải pháp là dùng mutex có cơ chế kế thừa ưu tiên để tạm nâng ưu tiên của $L$, giúp $L$ nhanh chóng nhả tài nguyên."
+  },
+
+  /* -------- Câu 8 -------- */
+  {
+    question: "Một counting semaphore được khởi tạo với giá trị ban đầu $N = 3$. Sau khi ba task lần lượt \"take\" thành công, giá trị bộ đếm là bao nhiêu?",
+    options: [
+      "$0$",
+      "$3$",
+      "$-3$",
+      "$\\dfrac{3}{3} = 1$"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. Mỗi lần \"take\" thành công giảm bộ đếm đi $1$, sau $3$ lần thì $3 - 3 = 0$.",
+      "Sai. $3$ là giá trị ban đầu, chưa trừ đi số lần take.",
+      "Sai. Bộ đếm semaphore không bao giờ nhận giá trị âm trong FreeRTOS.",
+      "Sai. Phép chia không có ý nghĩa trong ngữ cảnh này."
+    ],
+    explain: "Bộ đếm của counting semaphore được khởi tạo bằng $N$ (số tài nguyên sẵn có). Mỗi lần \"take\" thành công làm giá trị giảm $1$; mỗi lần \"give\" làm giá trị tăng $1$ (tối đa bằng $N$). Sau ba lần take liên tiếp: $3 - 1 - 1 - 1 = 0$. Nếu có task thứ tư gọi \"take\" với timeout khác $0$ thì nó sẽ bị chặn cho đến khi có task nhả tài nguyên."
+  },
+
+  /* -------- Câu 9 -------- */
+  {
+    question: "Để bảo vệ một vùng găng (critical section) truy cập tài nguyên dùng chung giữa nhiều task, nên dùng loại nào sau đây?",
+    options: [
+      "Mutex",
+      "Binary semaphore dùng như cờ báo hiệu",
+      "Counting semaphore khởi tạo bằng $0$",
+      "Queue có kích thước bằng $0$"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. Mutex được thiết kế riêng cho mục đích bảo vệ tài nguyên, có cơ chế kế thừa ưu tiên và kiểm tra chủ sở hữu.",
+      "Sai. Binary semaphore không có cơ chế kế thừa ưu tiên, dễ gây đảo ngược ưu tiên khi bảo vệ vùng găng.",
+      "Sai. Counting semaphore khởi tạo bằng $0$ dùng để đếm sự kiện, không phải để bảo vệ tài nguyên.",
+      "Sai. Queue không được dùng cho mục đích này; kích thước $0$ thậm chí không hợp lệ cho queue."
+    ],
+    explain: "Mutex có hai đặc điểm quan trọng không có ở binary semaphore: (1) <b>kế thừa ưu tiên</b> — giảm thiểu đảo ngược ưu tiên; (2) <b>quyền sở hữu</b> — chỉ task đã giữ mutex mới được nhả nó. Nhờ đó mutex là lựa chọn đúng đắn để bảo vệ vùng găng. Binary semaphore phù hợp hơn cho việc đồng bộ tín hiệu (ví dụ từ ISR tới task)."
+  },
+
+  /* -------- Câu 10 -------- */
+  {
+    question: "Hàm tạo binary semaphore trong FreeRTOS trả về giá trị gì nếu việc cấp phát bộ nhớ thất bại?",
+    options: [
+      "$\\text{NULL}$",
+      "$0$",
+      "$1$",
+      "$\\text{portMAX\\_DELAY}$"
+    ],
+    correct: 0,
+    notes: [
+      "Đúng. Nếu không đủ bộ nhớ cho cấu trúc semaphore, hàm trả về $\\text{NULL}$ để báo lỗi.",
+      "Sai. Giá trị $0$ là kết quả của một số hàm boolean, không phải giá trị trả về của hàm tạo semaphore.",
+      "Sai. Giá trị $1$ cũng không phải là giá trị trả về của hàm tạo semaphore.",
+      "Sai. $\\text{portMAX\\_DELAY}$ là hằng số thời gian, không phải giá trị báo lỗi cấp phát."
+    ],
+    explain: "Hàm tạo semaphore (dạng <i>xSemaphoreCreateBinary</i>) trả về một handle kiểu <i>SemaphoreHandle_t</i>. Nếu cấp phát động thất bại (hết heap), hàm trả về $\\text{NULL}$ — do đó code sử dụng bắt buộc phải kiểm tra giá trị này trước khi dùng. Trong trường hợp dùng semaphore tĩnh (dạng <i>xSemaphoreCreateBinaryStatic</i>), bộ nhớ do người dùng cung cấp nên không có khả năng thất bại cấp phát."
+  }
+];
+
+/* =========================================================
+   HIỂN THỊ ĐỀ THI
+   ========================================================= */
+const quizEl  = document.getElementById('quiz');
+const scoreEl = document.getElementById('score');
+const LETTERS = ['A', 'B', 'C', 'D'];
+
+let correctCount = 0;
+
+/* --- Render công thức MathJax (chờ thư viện sẵn sàng) --- */
+let mathJaxTries = 0;
+function typesetMath(el) {
+  if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
+    window.MathJax.typesetPromise([el]).catch(err => console.warn('MathJax:', err));
+  } else if (mathJaxTries++ < 150) {
+    setTimeout(() => typesetMath(el), 100);
+  }
+}
+
+/* --- Cập nhật điểm --- */
+function updateScore() {
+  scoreEl.textContent = correctCount + ' / ' + quizData.length;
+}
+
+/* --- Xây dựng toàn bộ đề --- */
+function buildQuiz() {
+  quizEl.innerHTML = '';
+  correctCount = 0;
+  updateScore();
+
+  quizData.forEach((item, qi) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const head = document.createElement('div');
+    head.className = 'card-head';
+    head.innerHTML = '<span class="badge">Câu ' + (qi + 1) + '</span>';
+
+    const qText = document.createElement('div');
+    qText.className = 'question-text';
+    qText.innerHTML = item.question;
+
+    const opts = document.createElement('div');
+    opts.className = 'options';
+
+    item.options.forEach((opt, oi) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'option';
+      btn.innerHTML =
+        '<span class="letter">' + LETTERS[oi] + '</span>' +
+        '<span class="opt-text">' + opt + '</span>';
+      btn.addEventListener('click', () => handleSelect(qi, oi, card, opts));
+      opts.appendChild(btn);
+    });
+
+    const exp = document.createElement('div');
+    exp.className = 'explanation';
+
+    card.appendChild(head);
+    card.appendChild(qText);
+    card.appendChild(opts);
+    card.appendChild(exp);
+    quizEl.appendChild(card);
+  });
+
+  typesetMath(quizEl);
+}
+
+/* =========================================================
+   XỬ LÝ KHI CHỌN ĐÁP ÁN
+   ========================================================= */
+function handleSelect(qi, oi, card, opts) {
+  if (card.dataset.done === '1') return;   // đã trả lời -> không cho chọn lại
+  card.dataset.done = '1';
+
+  const item    = quizData[qi];
+  const isRight = (oi === item.correct);
+
+  // Tô màu các lựa chọn
+  const buttons = opts.querySelectorAll('.option');
+  buttons.forEach((btn, i) => {
+    btn.classList.add('disabled');
+    if (i === item.correct) btn.classList.add('correct');   // đáp án đúng: XANH
+    if (i === oi && !isRight) btn.classList.add('wrong');   // chọn sai: ĐỎ
+  });
+
+  if (isRight) correctCount++;
+  updateScore();
+
+  // Tạo nội dung lời giải
+  const exp = card.querySelector('.explanation');
+  let html = '';
+
+  if (isRight) {
+    html += '<div class="verdict ok">✅ Chính xác! Đáp án ' + LETTERS[item.correct] + ' là đúng.</div>';
+    html += '<p><b>Vì sao đúng:</b> ' + item.notes[oi] + '</p>';
+  } else {
+    html += '<div class="verdict no">❌ Chưa đúng! Bạn chọn ' + LETTERS[oi] +
+            ' — đáp án đúng là <b>' + LETTERS[item.correct] + '</b>.</div>';
+    html += '<p><b>Vì sao lựa chọn ' + LETTERS[oi] + ' sai:</b> ' + item.notes[oi] + '</p>';
+    html += '<p><b>Vì sao ' + LETTERS[item.correct] + ' đúng:</b> ' + item.notes[item.correct] + '</p>';
+  }
+
+  html += '<p><b>📘 Lời giải chi tiết:</b> ' + item.explain + '</p>';
+
+  exp.innerHTML = html;
+  exp.classList.add('show', isRight ? 'ok' : 'no');
+
+  typesetMath(exp);
+}
+
+/* =========================================================
+   KHỞI ĐỘNG
+   ========================================================= */
+document.addEventListener('DOMContentLoaded', () => {
+  buildQuiz();
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    buildQuiz();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+});
+</script>
+
+</body>
+</html>
